@@ -1,83 +1,191 @@
-# showing carob's fertilizer group data
-path <- getwd()
-df <- read.csv("C:/Users/User/Documents/carob1/data/compiled/carob-fertilizer.csv")
+# showing carob's fertilizer and variety trials group data
 
-# minimize to EAC countries i.e DRC, Tanzania, Kenya, Burundi, Rwanda, South Sudan(we use Sudan like accorded in dataset), 
+path <- getwd()
+df0 <- read.csv("D:/OneDrive - CGIAR/Documents/carob1//data/compiled/carob_fertilizer.csv") # 115210
+df1 <- read.csv("D:/OneDrive - CGIAR/Documents/carob1//data/compiled/carob_variety_trials.csv") # 432
+
+# Data transformation/cleaning
+# checking variables that appear in both fertilizer and variety trials datasets
+
+f <- which(names(df0) %in% names(df1))
+names(df0)[f]
+
+# merging fertilizer and variety trials based on common variables in the two datasets
+
+df <- merge(df0,df1,by = names(df0)[f],all = TRUE) #115642
+
+# dropping duplicates
+
+df <- df[!duplicated(df),] # remaining 100930
+
+# minimize to EAC countries i.e DRC, Tanzania, Kenya, Burundi, Rwanda, South Sudan(not in dataset of interest), 
 # and Uganda.
 
 # subsetting to remain with EAC countries
-dd <- df[df$country %in% c("Democratic Republic of the Congo","Tanzania","Kenya", "Burundi", "Rwanda","Uganda"),] 
+dd <- df[df$country %in% c("Democratic Republic of the Congo","Tanzania","Kenya", "Burundi", "Rwanda","Uganda"),]  #35302, 
+
+# filling NA coords to avoid losing data
+
+# based on adm2
+g <- data.frame(country = c("Tanzania", "Tanzania", "Tanzania","Tanzania", "Tanzania", "Tanzania", "Tanzania"), 
+                adm2 = c("Lindi","Newala", "Biharamulo", "Tandahimba", "Nachingwea", "Serengeti","Masasi"),
+                lat = c(-9.5, -10.72487, -2.63194, -10.76232,-10.35959, -2.33333, -10.733), 
+                lon = c(38.5, 39.27979,31.30889, 39.63077, 38.78148, 34.83333, 38.767))
+
+r <- merge(dd,g,by = c("country","adm2"),all.x = TRUE)
+r$latitude <- ifelse(is.na(r$latitude),r$lat,r$latitude)
+r$longitude <- ifelse(is.na(r$longitude),r$lon,r$longitude)
+
+dd <- r[,1:85]
+
+# based on adm1
+g <- data.frame(country = c("Rwanda", "Rwanda", "Rwanda", "Tanzania", 
+                            "Tanzania", "Tanzania", "Tanzania", "Uganda", "Uganda", "Uganda", 
+                            "Uganda", "Uganda", "Uganda", "Uganda", "Uganda", "Uganda", "Uganda", 
+                            "Uganda"),
+                adm1 = c("Iburasirazuba", "Amajyaruguru", "Amajyepfo", 
+                         "Gairo", "Moshi", "Mvomero", "Kongwa", "Bukedea", "Kumi", "Kabale", 
+                         "Oyam", "Bulambuli", "Kanungu", "Manafwa", "Kapchorwa", "Kisoro", 
+                         "Sironko", "Lira"),
+                lat = c(-1.75, -1.5763, -2.59667, -6.13841,
+                        -3.35, -6.3, -6.2, 1.36667, 1.5, -1.24857, 2.38129, 1.32055, 
+                        -0.75, 0.88333, 1.3333, -1.28538, 1.157, 2.2499), 
+                lon = c(30.5,30.0675, 29.73944, 36.88079, 37.33333, 37.45, 36.417, 34.13333,
+                        33.95, 29.98993, 32.50071, 34.28062, 29.73, 34.33333, 34.42,
+                        29.68497, 34.314, 32.89985))
+
+r <- merge(dd,g,by = c("country","adm1"),all.x = TRUE)
+r$latitude <- ifelse(is.na(r$latitude),r$lat,r$latitude)
+r$longitude <- ifelse(is.na(r$longitude),r$lon,r$longitude)
+
+dd <- r[,1:85]
+
+# based on country
+g <- data.frame(country = c("Kenya", "Tanzania"), 
+                lat = c(1, -6), 
+                lon = c(38, 35))
+
+r <- merge(dd,g,by = c("country"),all.x = TRUE)
+r$latitude <- ifelse(is.na(r$latitude),r$lat,r$latitude)
+r$longitude <- ifelse(is.na(r$longitude),r$lon,r$longitude)
+
+# v <- dd
+# p <- complete.cases(v[,c("country")])
+# vv <- v[p,]
+# v1 <- unique(vv[is.na(vv$latitude) | is.na(vv$longitude), c("country", "latitude", "longitude")])
+# # v1 <- v1[v1$adm1 != "",]
+# 
+# for (i in 1:nrow(v1)) {
+#   ll <- carobiner::geocode(country = v1$country[i], adm1 = v1$country[i], location = v1$country[i], service = "geonames", username = "efyrouwa")
+#   ii <- unlist(jsonlite::fromJSON(ll))
+#   c <- as.integer(ii["totalResultsCount"][[1]])
+#   v1$latitude[i] <- as.numeric(ifelse(c == 1, ii["geonames.lat"][1], ii["geonames.lat1"][1]))
+#   v1$longitude[i] <- as.numeric(ifelse(c == 1, ii["geonames.lng"][1], ii["geonames.lng1"][1]))
+# }
+# 
+# v1 <- v1[!is.na(v1$latitude) | !is.na(v1$longitude),]
+# sss <- dput(v1)
+
+# 
+# t <- unique(dr[,c("longitude","latitude")])
+# library(leaflet)
+# places <- data.frame(latitude = t$latitude, longitude = t$longitude)
+# map <- leaflet(places) %>% addTiles() # adds default map tiles
+# map <- map %>% addMarkers(lng = ~longitude, lat = ~latitude)
+# map
+
+
+dr <- r #35302
 
 # subsetting to remain with variables of interest
-dd <- dd[,c("country","longitude","latitude","crop","N_fertilizer","P_fertilizer",
-            "K_fertilizer")] 
 
-# calculating missing values
-missing <- sapply(dd, function(x) sum(is.na(x)) / length(x) * 100)
+dr <- dr[,c("dataset_id","country","longitude","latitude","crop","N_fertilizer","P_fertilizer",
+            "K_fertilizer")]
+
+# calculating NAs 
+
+missing <- sapply(dr, function(x) sum(is.na(x)) / length(x) * 100)
 miss <- data.frame(Variables = names(missing), Missing_Percentage = missing)
 row.names(miss) <- NULL
 
-# Removing NAs from NPK fertilizer inputs(lost 6052 entries)
-dr <- dd[!is.na(dd$N_fertilizer),]
+# Data transformation/cleaning# dealing with NAs
+
+# distribution: removing  outlier amounts of NPK application and dropping amounts with above respective maximums
+
+rcrds <- read.csv("D:/OneDrive - CGIAR/Documents/carob1/terms/records.csv")
+
+for (i in names(dr)[5:length(dr)]) {
+  col_index <- which(unique(rcrds$name) == i)  # Find the index of the column in records to extract it's valid_max
+  valid_max <- rcrds$valid_max[col_index]  # Get the valid_max for the column
+  
+  # Check if valid_max is not NA and dr[i] > valid_max
+  if (!is.na(valid_max) && any(dr[[i]] > valid_max)) {
+    dr[[i]][dr[[i]] > valid_max] <- NA
+  }
+}
+
+# Removing NAs from NPK fertilizer inputs(lost 2967 entries remaining with 32335)
+
+dr <- dr[!is.na(dr$N_fertilizer),]
 dr <- dr[!is.na(dr$P_fertilizer),]
 dr <- dr[!is.na(dr$K_fertilizer),]
+
 # 
-library(leaflet)
-places <- data.frame(latitude = d.M.N.L$y,longitude = d.M.N.L$x)
-map <- leaflet(places) %>% addTiles() # adds default map tiles
-map <- map %>% addMarkers(lng = ~longitude, lat = ~latitude)
-map
-
-# Removing NAs lon and lat entries(lost 5 entries) # EGB actually 105
-dr <- dr[!is.na(dr$latitude),]
-dr <- dr[!is.na(dr$longitude),]
-
 # fixing datatypes
-# EGB: Not necessary
-dr$longitude <- as.numeric(dr$longitude)
-dr$K_fertilizer <- as.numeric(dr$K_fertilizer)
+# # EGB: Not necessary
+# dr$longitude <- as.numeric(dr$longitude)
+# dr$K_fertilizer <- as.numeric(dr$K_fertilizer)
 
-# # Create a frequency table of the crops
-# level <- table(dr$country)
-# 
-# # Create a ggplot2 bar plot with reordered fertilizer types
-# library(ggplot2)
-# ggplot(dr, aes(x = reorder(country, -level[country]), fill = country)) +
-#   geom_bar() +
-#   labs(x = "Country", y = "Frequency",title = "Frequency distribution of Country") +
-#   guides(fill = "none")
+# EDA
+# Create a frequency table of the countries
+
+level <- table(dr$country)
+
+# Create a sorted ggplot2 bar plot
+
+library(ggplot2)
+ggplot(dr, aes(x = reorder(country, -level[country]), fill = country)) +
+  geom_bar() +
+  labs(x = "Country", y = "Frequency",title = "Frequency distribution of Country") +
+  guides(fill = "none")
+
+# Create a frequency table of the crops
+
+level <- table(dr$crop)
+
+# Create a sorted ggplot2 bar plot
+
+library(ggplot2)
+ggplot(dr, aes(x = reorder(crop, -level[crop]), fill = crop)) +
+  geom_bar() +
+  labs(x = "Crop", y = "Frequency",title = "Frequency distribution of Crop") +
+  guides(fill = "none")
+
 
 # # N,P,K fertilizer boxplots
-# fert <- dr[,c("N_fertilizer","P_fertilizer","K_fertilizer")]
-# boxplot(fert, main = "Boxplot of N,P,K Fertilizers")
+fert <- dr[,c("N_fertilizer","P_fertilizer","K_fertilizer")]
+boxplot(fert, main = "Boxplot of N,P,K Fertilizers")
 
-# removing duplicate entries(lost 1469 entries)
-
-library(terra)
-# EGB: Remove points outside AOI
-KEN <- terra::vect("C:/Users/User/Downloads/gadm41_KEN.gpkg", layer = "ADM_ADM_0")
-TZA <- terra::vect("C:/Users/User/Downloads/gadm41_TZA.gpkg", layer = "ADM_ADM_0")
-RWA <- terra::vect("C:/Users/User/Downloads/gadm41_RWA.gpkg", layer = "ADM_ADM_0")
-UGA <- terra::vect("C:/Users/User/Downloads/gadm41_UGA.gpkg", layer = "ADM_ADM_0")
-BDI <- terra::vect("C:/Users/User/Downloads/gadm41_BDI.gpkg", layer = "ADM_ADM_0")
-EAC <- terra::union(terra::union(terra::union(terra::union(KEN,TZA),RWA),UGA),BDI)
-dr <- terra::as.data.frame(terra::intersect(terra::vect(dr, geom=c("longitude", "latitude")), EAC), geom	 = "XY")
-
-# # calculating quantiles to determine where they should fall dependent on variable distribution
+# calculating quantiles to determine where they should fall dependent on variable distribution
 # 
-# summary_stats <- c(0.00, 0.00, 22.5, 17.11, 30.00, 90.00) # P fertilizer
-# summary_stats <- c(0.00, 0.00, 0.00, 41.4, 100, 200.00) # N
-# summary_stats <- c(0.00, 0.00, 0, 18.85, 30.00, 75.00) # K
+# summary_stats <- c(0.00, 0.00, 15.00, 15.67, 30.00, 201.00) # P fertilizer
+# summary_stats <- c(0.00, 0.00, 0.00, 36.94, 60.00, 200.00) # N
+# summary_stats <- c(0.00, 0.00, 0.00, 20.15, 30.00, 180.00 ) # K
 # 
 # # calculating quantiles
-# quantiles <- quantile(summary_stats, probs = c(0, 0.5, 1))
+# quantiles <- quantile(summary_stats,probs = c(0,0.5,1))
 # # defining the threshold based on the median
 # threshold <- quantiles[2]
 # # creating quantile percentages
 # quantile_percentages <- round(quantiles / max(summary_stats) * 100, 2)
 
-# create groups of fertilier inputs
-dr$N_levels <- cut(dr$N_fertilizer, breaks = quantile(dr$N_fertilizer, probs = c(0.33,0.66,0.99)), 
+
+k <- dr[dr$N_levels == "Low",]
+summary(k$N_fertilizer)
+
+
+# create groups of fertilier inputs based on their individual distributions and quantiles
+dr$N_levels <- cut(dr$N_fertilizer, breaks = quantile(dr$N_fertilizer, probs = c(0.5,0.75,1)), 
                    labels = c("Low","High"), 
                    include.lowest = TRUE, right = FALSE)
 
@@ -88,9 +196,24 @@ dr$P_levels <- cut(dr$P_fertilizer, breaks = quantile(dr$P_fertilizer, probs = c
 dr$K_levels <- cut(dr$K_fertilizer, breaks = quantile(dr$K_fertilizer, probs = c(0.5,0.75,1)), 
                    labels = c("Low","High"),
                    include.lowest = TRUE, right = FALSE)
+
+
+library(terra)
+# EGB: Remove points outside AOI
+KEN <- terra::vect("C:/Users/User/Downloads/gadm41_KEN.gpkg", layer = "ADM_ADM_0")
+TZA <- terra::vect("C:/Users/User/Downloads/gadm41_TZA.gpkg", layer = "ADM_ADM_0")
+RWA <- terra::vect("C:/Users/User/Downloads/gadm41_RWA.gpkg", layer = "ADM_ADM_0")
+UGA <- terra::vect("C:/Users/User/Downloads/gadm41_UGA.gpkg", layer = "ADM_ADM_0")
+BDI <- terra::vect("C:/Users/User/Downloads/gadm41_BDI.gpkg", layer = "ADM_ADM_0")
+COD <- terra::vect("C:/Users/User/Downloads/gadm41_COD.gpkg", layer = "ADM_ADM_0")
+EAC <- terra::union(terra::union(terra::union(terra::union(terra::union(KEN,TZA),RWA),UGA),BDI),COD)
+dr <- terra::as.data.frame(terra::intersect(terra::vect(dr, geom=c("longitude", "latitude")), EAC), geom	 = "XY")
+
+
 # dr <- unique(dr[,c(lati])
 # EGB: Nice! But also subset for crop!
-# subsetting per fertilizer level
+
+# subsetting per fertilizer level for maize which has the highest inputs and is of our interest
 # N_levels
 # First, low amounts
 # de <- dr[dr$N_levels == "Low",]
@@ -106,6 +229,11 @@ d.M.N.H <- na.omit(d.M.N.H)
 # d.B.N.H <- unique(dr[dr$N_levels == "High" & dr$crop == "common bean",c("y","x")])
 # # subsetting unique for lon and lat
 # dt <- unique(de[,c("latitude","longitude")])
+
+
+
+dr <- dz
+
 
 # EGB: Noooo! raster = TRUE 
 # extracting bio climatic conditions per coordinate
