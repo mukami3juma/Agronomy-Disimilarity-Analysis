@@ -180,11 +180,8 @@ boxplot(fert, main = "Boxplot of N,P,K Fertilizers")
 # quantile_percentages <- round(quantiles / max(summary_stats) * 100, 2)
 
 
-k <- dr[dr$N_levels == "Low",]
-summary(k$N_fertilizer)
-
-
 # create groups of fertilier inputs based on their individual distributions and quantiles
+
 dr$N_levels <- cut(dr$N_fertilizer, breaks = quantile(dr$N_fertilizer, probs = c(0.5,0.75,1)), 
                    labels = c("Low","High"), 
                    include.lowest = TRUE, right = FALSE)
@@ -217,10 +214,10 @@ dr <- terra::as.data.frame(terra::intersect(terra::vect(dr, geom=c("longitude", 
 # N_levels
 # First, low amounts
 # de <- dr[dr$N_levels == "Low",]
-d.M.N.L <- unique(dr[dr$N_levels == "Low" & dr$crop == "maize",c("y","x")])
+d.M.N.L <- unique(dr[dr$N_levels == "Low" & dr$crop == "maize",c("y","x")]) # 4566 with low N input and crop maize but 298 points are unique
 d.M.N.L<- na.omit(d.M.N.L)
 
-d.M.N.H <- unique(dr[dr$N_levels == "High" & dr$crop == "maize",c("y","x")])
+d.M.N.H <- unique(dr[dr$N_levels == "High" & dr$crop == "maize",c("y","x")]) # 7397 with high N input and crop maize but 288 points are unique
 d.M.N.H <- na.omit(d.M.N.H)
 
 # d.S.N.L <- unique(dr[dr$N_levels == "Low" & dr$crop == "soybean",c("y","x")])
@@ -230,23 +227,87 @@ d.M.N.H <- na.omit(d.M.N.H)
 # # subsetting unique for lon and lat
 # dt <- unique(de[,c("latitude","longitude")])
 
-
-
-dr <- dz
-
-
-# EGB: Noooo! raster = TRUE 
 # extracting bio climatic conditions per coordinate
 
+
+# source("https://raw.githubusercontent.com/egbendito/AgWISE-generic/develop/00_dataProcessing/worldclim.R")
 source("C:/Users/User/Documents/AgWISE-generic/00_dataProcessing/worldclim.R")
-install.packages("raster")
+
+# install.packages("raster")
 library(raster)
+
+# downloading worlclim variables
 
 f <- worldclim(var=c("tavg", "tmin", "tmax", "prec","elev","bio"),10,raster = TRUE,coords = data.frame(X = c(terra::ext(EAC)[1][[1]], terra::ext(EAC)[2][[1]]),
                                                                                                        Y = c(terra::ext(EAC)[3][[1]], terra::ext(EAC)[4][[1]])))
 
-ff <- worldclim(var=c("tavg", "tmin", "tmax", "prec","elev","bio"),10,raster = FALSE,coords = data.frame(X = c(terra::ext(EAC)[1][[1]], terra::ext(EAC)[2][[1]]),
-                                                                                                         Y = c(terra::ext(EAC)[3][[1]], terra::ext(EAC)[4][[1]])))
+
+# 
+# ff <- worldclim(var=c("tavg", "tmin", "tmax", "prec","elev","bio"),10,raster = FALSE,coords = data.frame(X = c(terra::ext(f1)[1][[1]], terra::ext(f1)[2][[1]]),
+#                                                                                                          Y = c(terra::ext(f1)[3][[1]], terra::ext(f1)[4][[1]])))
+
+# masking to exact boundary of AOI
+f <- terra::crop(f,EAC)
+f <- terra::mask(f,EAC)
+plot(f[[1]])
+plot(EAC,add=T)
+points(x=d.M.N.L$x,y=d.M.N.L$y)
+
+# downloading iSDA variables soil info, depth 0-20cm and geodata package for whole of AFRICA
+
+pH <- geodata::soil_af_isda("pH.H2O", depth = 20, path='data/', quiet=TRUE)
+SOC <- geodata::soil_af_isda("C.tot", depth = 20, path='data/', quiet=TRUE)
+sand <- geodata::soil_af_isda("sand", depth = 20, path='data/', quiet=TRUE)
+clay <- geodata::soil_af_isda("clay", depth = 20, path='data/', quiet=TRUE)
+silt <- geodata::soil_af_isda("silt", depth = 20, path='data/', quiet=TRUE)
+N <- geodata::soil_af_isda("N.tot", depth = 20, path='data/', quiet=TRUE)
+K <- geodata::soil_af_isda("K", depth = 20, path='data/', quiet=TRUE)
+P <- geodata::soil_af_isda("P", depth = 20, path='data/', quiet=TRUE)
+texture <- geodata::soil_af_isda("texture", depth = 20, path='data/', quiet=TRUE)
+
+# cropping and masking soil details to only needed AOI
+pH <- resample(terra::mask(terra::crop(pH,EAC),EAC),f)
+SOC <- resample(terra::mask(terra::crop(SOC,EAC),EAC),f)
+sand <- resample(terra::mask(terra::crop(sand,EAC),EAC),f)
+clay <- resample(terra::mask(terra::crop(clay,EAC),EAC),f)
+silt <- resample(terra::mask(terra::crop(silt,EAC),EAC),f)
+N <- resample(terra::mask(terra::crop(N,EAC),EAC),f)
+K <- resample(terra::mask(terra::crop(K,EAC),EAC),f)
+P <- resample(terra::mask(terra::crop(P,EAC),EAC),f)
+texture <- resample(terra::mask(terra::crop(texture,EAC),EAC),f)
+
+plot(pH) 
+plot(EAC,add=T)
+points(x=d.M.N.L$x,y=d.M.N.L$y)
+plot(SOC)
+plot(EAC,add=T)
+plot(sand)
+plot(EAC,add=T)
+plot(clay)
+plot(EAC,add=T)
+plot(silt)
+plot(EAC,add=T)
+plot(N)
+plot(EAC,add=T)
+plot(K)
+plot(EAC,add=T)
+plot(P)
+plot(EAC,add=T)
+plot(texture)
+plot(EAC,add=T)
+
+
+# putting environmental and soil properties in one
+# spatial raster(they must have similar extents in order to be combined,so we follow f's extent)
+
+spat_raster<- c(f,pH, SOC, sand, clay, silt, N, K, P,texture)
+
+# Stack the SpatRaster objects into a single SpatRaster brick
+stacked_raster <- raster::stack(spat_raster)
+
+# Print information about the stacked raster
+print(stacked_raster)
+
 
 install.packages("dismo")
 library("dismo")
@@ -255,44 +316,17 @@ library("rgeos")
 library("terra")
 install.packages("rJava")
 library("rJava")
-# 
-# install.packages("knitr")
-# library("knitr")
-# knitr::opts_knit$set(root.dir = 'C:/Users/User/Documents/carob1/maxent_test_run')
-# opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
-# 
-# # prepare folders for data input and output
-# if (!file.exists("C:/Users/User/Documents/carob1/data")) dir.create("C:/Users/User/Documents/carob1/data")
-# if (!file.exists("C:/Users/User/Documents/carob1/data/worldclim")) dir.create("C:/Users/User/Documents/carob1/data/worldclim")
-# if (!file.exists("C:/Users/User/Documents/carob1/data/studyarea")) dir.create("C:/Users/User/Documents/carob1/data/studyarea")
-# if (!file.exists("C:/Users/User/Documents/carob1/output")) dir.create("C:/Users/User/Documents/carob1/output")
-# require(utils)
-# # download climate data from worldclim.org
-# utils::download.file(url = "http://biogeo.ucdavis.edu/data/climate/worldclim/1_4/grid/cur/tavg_10m_bil.zip", 
-#                      destfile = paste0("../data/bioclim/bio_10m_bil.zip"))
-# utils::unzip("../data/bioclim/bio_10m_bil.zip", exdir = "../data/bioclim/")
-# 
-# # This searches for all files that are in the path
-# # 'data/bioclim/' and have a file extension of .bil. You can
-# # edit this code to reflect the path name and file extension
-# # for your environmental variables
-# clim_list <- list.files("../data/bioclim/", pattern = ".bil$", 
-#                         full.names = T)  # '..' leads to the path above the folder where the .rmd file is located
-# 
-# # stacking the bioclim variables to process them at one go
-# clim <- raster::stack(clim_list)
-# 
-# 
 
-ncell(f)
+
+ncell(stacked_raster) # high ncell shows more higher spatial resolution and more detailed data
 set.seed(23) 
 bg <- sampleRandom(x=raster::stack(f),
-                   size=ncell(f),
+                   size=ncell(stacked_raster),
                    na.rm=T, #removes the 'Not Applicable' points  
                    sp=T) # return spatial points 
 
 # viewing first env condition on plot
-terra::plot(f[[1]]) 
+plot(stacked_raster[[68]])
 
 # add the background points to the plotted raster
 terra::plot(bg,add=T)
